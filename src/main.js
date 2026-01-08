@@ -1,25 +1,42 @@
 import "./style.css";
 import * as THREE from "three";
+import { SwatCharacter } from "./SwatCharacter.js";
+import { ThirdPersonCamera } from "./ThirdPersonCamera.js";
 
 const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x808080);
 
-const geometry = new THREE.BoxGeometry(1, 1, 1);
-const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-const mesh = new THREE.Mesh(geometry, material);
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+scene.add(ambientLight);
 
-scene.add(mesh);
+const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+directionalLight.position.set(5, 5, 5);
+scene.add(directionalLight);
 
-const temp = {
-  width: 1024,
-  height: 720,
-};
-
-const camera = new THREE.PerspectiveCamera(75, temp.width / temp.height);
+const camera = new THREE.PerspectiveCamera(75, 1024 / 720);
+const thirdPersonCamera = new ThirdPersonCamera(camera);
 
 const renderer = new THREE.WebGLRenderer();
-renderer.setSize(temp.width, temp.height);
+renderer.setSize(1080, 720);
 document.body.appendChild(renderer.domElement);
 
-camera.position.z = 4;
+const character = new SwatCharacter();
+character
+  .initialize()
+  .then((model) => {
+    scene.add(model);
+    thirdPersonCamera.setTarget(character);
+  })
+  .catch((error) => console.error("Failed to load character:", error));
 
-renderer.render(scene, camera);
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const delta = clock.getDelta();
+
+  character.update(delta);
+  thirdPersonCamera.update();
+
+  renderer.render(scene, camera);
+}
+animate();
