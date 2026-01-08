@@ -4,10 +4,9 @@ import * as THREE from "three";
 export class SwatCharacter extends Character {
   constructor() {
     super();
-    this.moveSpeed = 2.0;
+    this.moveSpeed = 2.5;
     this.keys = { w: false, a: false, s: false, d: false, " ": false };
 
-    // Jump physics
     this.jumpForce = 5.0;
     this.gravity = -15.0;
     this.verticalVelocity = 0;

@@ -20,7 +20,6 @@ export class Character {
           this.model = gltf.scene;
           this.model.position.set(0, 0, 0);
 
-          // Add model to container to prevent animation root motion from affecting position
           this.container.add(this.model);
 
           if (gltf.animations.length > 0) {
@@ -57,19 +56,19 @@ export class Character {
 
             // Remove Hips position track to prevent root motion conflicts
             const tracks = clip.tracks.filter(
-              (track) => !track.name.toLowerCase().includes("hips.position")
+              (track) => !track.name.toLowerCase().includes("hips.position"),
             );
 
             this.animations[animationName] = new THREE.AnimationClip(
               animationName,
               clip.duration,
-              tracks
+              tracks,
             );
           }
           resolve();
         },
         undefined,
-        (error) => reject(error)
+        (error) => reject(error),
       );
     });
   }
