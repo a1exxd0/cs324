@@ -3,7 +3,8 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 export class Character {
   constructor() {
-    this.model = null;
+    this.container = new THREE.Object3D(); // Root container for movement
+    this.model = null; // The actual mesh (affected by animations)
     this.mixer = null;
     this.head = null;
     this.animations = {};
@@ -19,17 +20,15 @@ export class Character {
           this.model = gltf.scene;
           this.model.position.set(0, 0, 0);
 
+          // Add model to container to prevent animation root motion from affecting position
+          this.container.add(this.model);
+
           if (gltf.animations.length > 0) {
             this.mixer = new THREE.AnimationMixer(this.model);
-
             gltf.animations.forEach((clip) => {
               this.animations[clip.name] = clip;
-              console.log("Animation available:", clip.name);
             });
-
-            if (gltf.animations[0]) {
-              this.playAnimation(gltf.animations[0].name);
-            }
+            this.playAnimation(gltf.animations[0].name);
           }
 
           this.model.traverse((child) => {
@@ -38,7 +37,7 @@ export class Character {
             }
           });
 
-          resolve(this.model);
+          resolve(this.container);
         },
         undefined,
         (error) => reject(error),
@@ -54,50 +53,51 @@ export class Character {
         animationPath,
         (gltf) => {
           if (gltf.animations.length > 0) {
-            this.animations[animationName] = gltf.animations[0];
-            console.log("Loaded animation:", animationName);
+            const clip = gltf.animations[0];
+
+            // Remove Hips position track to prevent root motion conflicts
+            const tracks = clip.tracks.filter(
+              (track) => !track.name.toLowerCase().includes("hips.position")
+            );
+
+            this.animations[animationName] = new THREE.AnimationClip(
+              animationName,
+              clip.duration,
+              tracks
+            );
           }
           resolve();
         },
         undefined,
-        (error) => reject(error),
+        (error) => reject(error)
       );
     });
   }
 
   playAnimation(name) {
-    if (!this.mixer || !this.animations[name]) {
-      console.warn("Animation not found:", name);
-      return;
-    }
+    if (!this.mixer || !this.animations[name]) return;
 
     const nextAction = this.mixer.clipAction(this.animations[name]);
-    if (this.currentAction && this.currentAction !== nextAction) {
-      this.currentAction.fadeOut(0.2);
+
+    if (this.currentAction !== nextAction) {
+      this.currentAction?.fadeOut(0.2);
       nextAction.reset().fadeIn(0.2).play();
-    } else if (!this.currentAction) {
-      nextAction.play();
+      this.currentAction = nextAction;
     }
-    this.currentAction = nextAction;
   }
 
   getHeadPosition() {
     if (this.head) {
-      const worldPos = new THREE.Vector3();
-      this.head.getWorldPosition(worldPos);
-      return worldPos;
+      return this.head.getWorldPosition(new THREE.Vector3());
     }
-
-    return this.model.position.clone().add(new THREE.Vector3(0, 1.7, 0));
+    return this.container.position.clone().add(new THREE.Vector3(0, 1.7, 0));
   }
 
   update(deltaTime) {
-    if (this.mixer) {
-      this.mixer.update(deltaTime);
-    }
+    this.mixer?.update(deltaTime);
   }
 
   getModel() {
-    return this.model;
+    return this.container;
   }
 }

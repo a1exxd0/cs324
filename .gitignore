@@ -25,3 +25,6 @@ dist-ssr
 
 # Blender artefacts
 blender/*
+
+# Claude artefacts
+CLAUDE.md

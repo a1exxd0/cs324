@@ -1,7 +1,7 @@
 import * as THREE from "three";
 
 export class ThirdPersonCamera {
-  constructor(camera, offset = new THREE.Vector3(0, 0.2, -1)) {
+  constructor(camera, offset = new THREE.Vector3(0, 0.2, -2)) {
     this.camera = camera;
     this.offset = offset;
     this.target = null;
@@ -12,14 +12,14 @@ export class ThirdPersonCamera {
   }
 
   update() {
-    if (!this.target || !this.target.model) return;
+    if (!this.target?.container) return;
 
     const headPos = this.target.getHeadPosition();
-    const rotatedOffset = this.offset.clone();
-    rotatedOffset.applyQuaternion(this.target.model.quaternion);
+    const rotatedOffset = this.offset
+      .clone()
+      .applyQuaternion(this.target.container.quaternion);
 
-    const targetPos = headPos.clone().add(rotatedOffset);
-    this.camera.position.copy(targetPos);
+    this.camera.position.copy(headPos.clone().add(rotatedOffset));
     this.camera.lookAt(headPos);
   }
 }
