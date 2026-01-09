@@ -4,18 +4,27 @@ import * as THREE from "three";
 export class SwatCharacter extends Character {
   constructor() {
     super();
-    this.moveSpeed = 2.5;
+    this.moveSpeed = 2.0;
     this.keys = { w: false, a: false, s: false, d: false, " ": false };
 
     this.jumpForce = 5.0;
     this.gravity = -15.0;
     this.verticalVelocity = 0;
-    this.groundHeight = 1.6;
     this.isJumping = false;
     this.jumpCooldown = 0;
     this.jumpCooldownDuration = 0.5;
 
+    // Collision detection
+    this.collidables = [];
+    this.collisionDistance = 0.6; // Distance to check for obstacles
+    this.raycaster = new THREE.Raycaster();
+    this.groundCheckDistance = 10; // Max distance to check for ground
+
     this.setupInputHandlers();
+  }
+
+  setCollidables(collidables) {
+    this.collidables = collidables;
   }
 
   async initialize() {
@@ -52,6 +61,58 @@ export class SwatCharacter extends Character {
     window.addEventListener("keyup", (e) => handleKey(e, false));
   }
 
+  checkCollision(direction) {
+    if (this.collidables.length === 0) return false;
+
+    const normalizedDirection = direction.clone().normalize();
+
+    // Cast multiple rays at different heights for better collision detection
+    const heights = [0.1, 0.5, 1.0, 1.5]; // Feet, knees, waist, chest
+
+    for (const height of heights) {
+      const origin = this.container.position.clone();
+      origin.y += height;
+
+      this.raycaster.set(origin, normalizedDirection);
+      const intersects = this.raycaster.intersectObjects(
+        this.collidables,
+        false,
+      );
+
+      // Check if any collision is within the collision distance
+      if (
+        intersects.length > 0 &&
+        intersects[0].distance < this.collisionDistance
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  findGroundBelow() {
+    if (this.collidables.length === 0) return null;
+
+    // Cast ray downward from slightly above character's feet (pivot point)
+    // This prevents the ray from starting inside the floor geometry
+    const origin = this.container.position.clone();
+    origin.y += 0.1; // Start slightly above feet to avoid starting inside geometry
+    const direction = new THREE.Vector3(0, -1, 0);
+
+    this.raycaster.set(origin, direction);
+    const intersects = this.raycaster.intersectObjects(this.collidables, false);
+
+    // Return the closest ground below (if any within range)
+    if (
+      intersects.length > 0 &&
+      intersects[0].distance < this.groundCheckDistance
+    ) {
+      return intersects[0];
+    }
+    return null;
+  }
+
   update(deltaTime) {
     super.update(deltaTime);
     if (!this.model) return;
@@ -68,22 +129,37 @@ export class SwatCharacter extends Character {
       this.isJumping = true;
     }
 
+    // Apply gravity and vertical movement
     this.verticalVelocity += this.gravity * deltaTime;
-    this.container.position.y += this.verticalVelocity * deltaTime;
+    const newY = this.container.position.y + this.verticalVelocity * deltaTime;
 
-    if (this.container.position.y <= this.groundHeight) {
-      this.container.position.y = this.groundHeight;
-      this.verticalVelocity = 0;
+    // Check ground collision before moving
+    const groundHit = this.findGroundBelow();
 
-      if (this.isJumping) {
-        this.jumpCooldown = this.jumpCooldownDuration;
+    if (groundHit) {
+      const groundY = groundHit.point.y;
+
+      // If falling and would go through ground, snap to ground
+      // Add small epsilon (0.05) above ground to prevent phasing
+      if (this.verticalVelocity <= 0 && newY <= groundY + 0.05) {
+        this.container.position.y = groundY + 0.05;
+        this.verticalVelocity = 0;
+
+        if (this.isJumping) {
+          this.jumpCooldown = this.jumpCooldownDuration;
+        }
+        this.isJumping = false;
+      } else {
+        // Safe to move
+        this.container.position.y = newY;
       }
-      this.isJumping = false;
+    } else {
+      // No ground detected, apply movement
+      this.container.position.y = newY;
     }
 
-    if (this.isJumping) {
-      targetAnimation = "jump";
-    } else if (this.keys.w) {
+    // Determine horizontal movement direction (independent of jump state)
+    if (this.keys.w) {
       moveDirection.z = 1;
       targetAnimation = "walkForward";
     } else if (this.keys.s) {
@@ -97,19 +173,74 @@ export class SwatCharacter extends Character {
       targetAnimation = "strafeRight";
     }
 
+    // Jump animation overrides movement animation
+    if (this.isJumping) {
+      targetAnimation = "jump";
+    }
+
     // Update animation if changed
     const currentClipName = this.currentAction?.getClip().name;
     if (!this.currentAction || currentClipName !== targetAnimation) {
       this.playAnimation(targetAnimation);
     }
 
-    // Apply horizontal movement
+    // Apply horizontal movement with collision detection and sliding
     if (moveDirection.length() > 0) {
-      moveDirection
+      const normalizedDirection = moveDirection.clone().normalize();
+      const worldDirection = normalizedDirection
+        .clone()
+        .applyQuaternion(this.container.quaternion);
+
+      const movement = moveDirection
+        .clone()
         .normalize()
         .multiplyScalar(this.moveSpeed * deltaTime)
         .applyQuaternion(this.container.quaternion);
-      this.container.position.add(moveDirection);
+
+      const oldPosition = this.container.position.clone();
+
+      // Try full movement first
+      if (!this.checkCollision(worldDirection)) {
+        this.container.position.add(movement);
+
+        // Check if we're still above ground after moving
+        // Prevent walking off edges into void
+        const groundCheck = this.findGroundBelow();
+        if (!groundCheck || groundCheck.distance - 0.1 > 2.0) {
+          // Too far from ground or no ground - undo movement
+          this.container.position.copy(oldPosition);
+        }
+      } else {
+        // Blocked - try sliding along X axis only
+        const xMovement = new THREE.Vector3(movement.x, 0, 0);
+        const xDirection = xMovement.clone().normalize();
+
+        if (xMovement.length() > 0 && !this.checkCollision(xDirection)) {
+          this.container.position.add(xMovement);
+          const groundCheck = this.findGroundBelow();
+          if (!groundCheck || groundCheck.distance - 0.1 > 2.0) {
+            this.container.position.copy(oldPosition);
+          }
+        }
+
+        // Try sliding along Z axis only (from original position)
+        const oldPos2 = this.container.position.clone();
+        this.container.position.copy(oldPosition);
+
+        const zMovement = new THREE.Vector3(0, 0, movement.z);
+        const zDirection = zMovement.clone().normalize();
+
+        if (zMovement.length() > 0 && !this.checkCollision(zDirection)) {
+          this.container.position.add(zMovement);
+          const groundCheck = this.findGroundBelow();
+          if (!groundCheck || groundCheck.distance - 0.1 > 2.0) {
+            this.container.position.copy(oldPos2);
+          }
+        } else {
+          // Restore X movement if Z failed
+          this.container.position.copy(oldPos2);
+        }
+      }
     }
   }
 }
