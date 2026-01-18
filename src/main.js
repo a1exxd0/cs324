@@ -1,24 +1,62 @@
 import "./style.css";
 import { LevelManager } from "./LevelManager.js";
+import { GameStateManager } from "./core/GameStateManager.js";
+import { InputManager } from "./core/InputManager.js";
+import { PauseMenu } from "./ui/PauseMenu.js";
 
 // Create landing page
 const landingPage = document.createElement("div");
 landingPage.id = "landing-page";
 document.body.appendChild(landingPage);
 
-// Game state - track unlocked levels
-const gameState = {
-  unlockedLevels: [0, 1, 2], // All levels unlocked by default for development
-};
+// Initialize managers
+const stateManager = new GameStateManager();
+const inputManager = new InputManager(stateManager);
+inputManager.init();
 
 // Level manager instance
 let levelManager = null;
+
+// Create pause menu with callbacks
+const pauseMenu = new PauseMenu(stateManager, {
+  onShowInstructions: (fromPause) => {
+    // Show landing page with instructions
+    if (!document.body.contains(landingPage)) {
+      document.body.appendChild(landingPage);
+    }
+    showInstructions(fromPause);
+  },
+  onReturnToMainMenu: () => {
+    // Cleanup level before returning to menu
+    if (levelManager) {
+      levelManager.cleanup();
+      levelManager = null;
+    }
+    // Show landing page with main menu content
+    if (!document.body.contains(landingPage)) {
+      document.body.appendChild(landingPage);
+    }
+    showMainMenu();
+  }
+});
+
+// Listen for ESC key to toggle pause
+inputManager.onSystemInput('escape', () => {
+  if (stateManager.isPlaying()) {
+    stateManager.pause();
+  } else if (stateManager.isPaused()) {
+    stateManager.resume();
+  }
+});
 
 // Show main menu initially
 showMainMenu();
 
 // Function to show main menu
 function showMainMenu() {
+  // Update state
+  stateManager.enterMainMenu();
+
   // Release pointer lock if active
   if (document.pointerLockElement) {
     document.exitPointerLock();
@@ -37,17 +75,20 @@ function showMainMenu() {
 
   // Button event listeners
   document.getElementById("play-btn").addEventListener("click", showLevelSelect);
-  document.getElementById("instructions-btn").addEventListener("click", showInstructions);
+  document.getElementById("instructions-btn").addEventListener("click", () => showInstructions(false));
 }
 
 // Function to show level selection menu
 function showLevelSelect() {
+  // Update state
+  stateManager.enterLevelSelect();
+
   // Release pointer lock if active
   if (document.pointerLockElement) {
     document.exitPointerLock();
   }
 
-  const level1Unlocked = gameState.unlockedLevels.includes(1);
+  const level1Unlocked = stateManager.isLevelUnlocked(1);
 
   landingPage.innerHTML = `
     <div class="menu-container level-select-container">
@@ -81,7 +122,7 @@ function showLevelSelect() {
   }
 
   // Level 2 click listener (only if unlocked)
-  const level2Unlocked = gameState.unlockedLevels.includes(2);
+  const level2Unlocked = stateManager.isLevelUnlocked(2);
   if (level2Unlocked) {
     // Update the level 2 card to be unlocked
     const level2Card = document.querySelector('.level-grid > .level-card:nth-child(3)');
@@ -102,6 +143,11 @@ function showLevelSelect() {
 
 // Function to show instructions page
 function showInstructions(fromPauseMenu = false) {
+  // Update state (will be overridden if coming from pause)
+  if (!fromPauseMenu) {
+    stateManager.enterInstructions();
+  }
+
   // Release pointer lock if active
   if (document.pointerLockElement) {
     document.exitPointerLock();
@@ -153,7 +199,8 @@ function showInstructions(fromPauseMenu = false) {
   document.getElementById("back-btn").addEventListener("click", () => {
     if (fromPauseMenu) {
       landingPage.remove();
-      togglePauseMenu();
+      // Return to pause menu (not directly to game)
+      stateManager.returnToPauseMenu();
     } else {
       showMainMenu();
     }
@@ -169,6 +216,9 @@ const backstorySlides = [
 
 // Function to start Level 0 (Briefing)
 function startLevel0() {
+  // Update state
+  stateManager.startBriefing();
+
   // Release pointer lock if active
   if (document.pointerLockElement) {
     document.exitPointerLock();
@@ -180,7 +230,7 @@ function startLevel0() {
   function showSlide(index) {
     if (index >= backstorySlides.length) {
       // All slides complete - unlock Level 1 and return to level select
-      gameState.unlockedLevels.push(1);
+      stateManager.unlockLevel(1);
       showLevelSelect();
       return;
     }
@@ -238,78 +288,25 @@ function showBlankPage(title) {
   `;
 }
 
-// Pause menu state
-let isPaused = false;
-let pauseMenuElement = null;
-
-// Function to toggle pause menu - exposed globally for LevelManager
-window.togglePauseMenu = function togglePauseMenu() {
-  isPaused = !isPaused;
-
-  if (isPaused) {
-    // Show pause menu
-    pauseMenuElement = document.createElement("div");
-    pauseMenuElement.id = "pause-menu";
-    pauseMenuElement.innerHTML = `
-      <div class="pause-overlay">
-        <div class="menu-container pause-menu-container">
-          <h1 class="menu-subtitle">PAUSED</h1>
-          <div class="menu-buttons">
-            <button id="resume-btn" class="menu-button">RESUME</button>
-            <button id="instructions-pause-btn" class="menu-button">INSTRUCTIONS</button>
-            <button id="main-menu-btn" class="menu-button">MAIN MENU</button>
-          </div>
-        </div>
-      </div>
-    `;
-    document.body.appendChild(pauseMenuElement);
-
-    // Button listeners
-    document.getElementById("resume-btn").addEventListener("click", togglePauseMenu);
-    document.getElementById("instructions-pause-btn").addEventListener("click", () => {
-      pauseMenuElement.remove();
-      isPaused = false;
-      // Show landing page again with instructions
-      document.body.appendChild(landingPage);
-      showInstructions(true); // Pass true to indicate coming from pause menu
-    });
-    document.getElementById("main-menu-btn").addEventListener("click", () => {
-      pauseMenuElement.remove();
-      isPaused = false;
-      // Show landing page again with main menu
-      document.body.appendChild(landingPage);
-      showMainMenu();
-    });
-
-    // Lock pointer release
-    if (document.pointerLockElement) {
-      document.exitPointerLock();
-    }
-  } else {
-    // Hide pause menu
-    if (pauseMenuElement) {
-      pauseMenuElement.remove();
-      pauseMenuElement = null;
-    }
-  }
-}
-
 // Game initialization function (Level 1)
 async function startGame() {
   // Remove landing page
   landingPage.remove();
 
-  // Create new level manager
-  levelManager = new LevelManager();
+  // Cleanup previous level manager if exists
+  if (levelManager) {
+    levelManager.cleanup();
+  }
+
+  // Create new level manager with managers
+  levelManager = new LevelManager(stateManager, inputManager);
 
   try {
     // Start Level 1 with callback for when cutscene ends
     await levelManager.startLevel1(() => {
       // Callback for when cutscene ends - unlock Level 2 and return to mission select
-      if (!gameState.unlockedLevels.includes(2)) {
-        gameState.unlockedLevels.push(2);
-        console.log("Level 2 unlocked!");
-      }
+      stateManager.unlockLevel(2);
+      console.log("Level 2 unlocked!");
       document.body.appendChild(landingPage);
       showLevelSelect();
     });
@@ -326,8 +323,13 @@ async function startLevel2() {
   // Remove landing page
   landingPage.remove();
 
-  // Create new level manager
-  levelManager = new LevelManager();
+  // Cleanup previous level manager if exists
+  if (levelManager) {
+    levelManager.cleanup();
+  }
+
+  // Create new level manager with managers
+  levelManager = new LevelManager(stateManager, inputManager);
 
   try {
     // Start Level 2 with callback to return to mission select after cutscene

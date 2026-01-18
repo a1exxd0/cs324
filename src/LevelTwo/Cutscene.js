@@ -6,10 +6,14 @@
  * Show a cutscene with text that appears character by character
  * @param {Array<string>} slides - Array of text slides to show
  * @param {Function} onComplete - Callback when cutscene completes
+ * @param {Object} stateManager - GameStateManager instance
  * @param {Object} renderer - Three.js renderer to hide
  * @param {Object} hud - HUD to hide
  */
-export function showCutscene(slides, onComplete, renderer = null, hud = null) {
+export function showCutscene(slides, onComplete, stateManager, renderer = null, hud = null) {
+  // Enter cutscene state
+  stateManager.enterCutscene();
+
   // Hide renderer canvas and HUD
   if (renderer && renderer.domElement) {
     renderer.domElement.style.display = "none";
@@ -18,11 +22,20 @@ export function showCutscene(slides, onComplete, renderer = null, hud = null) {
     hud.hide();
   }
 
-  // Create cutscene container
+  // Create cutscene container - full viewport coverage for click anywhere
   const cutsceneContainer = document.createElement("div");
   cutsceneContainer.id = "cutscene-container";
   cutsceneContainer.className = "briefing-container";
-  cutsceneContainer.style.backgroundColor = "#1a1a1a"; // Solid background
+  cutsceneContainer.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: #1a1a1a;
+    cursor: pointer;
+    z-index: 1000;
+  `;
 
   let currentSlide = 0;
   let isTyping = false;
@@ -31,6 +44,7 @@ export function showCutscene(slides, onComplete, renderer = null, hud = null) {
     if (index >= slides.length) {
       // All slides complete - cleanup and callback
       cutsceneContainer.remove();
+      stateManager.exitCutscene();
       if (onComplete) {
         onComplete();
       }

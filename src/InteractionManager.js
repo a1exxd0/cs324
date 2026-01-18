@@ -16,16 +16,28 @@ import * as THREE from "three";
  * - enabled: whether interaction is currently allowed
  */
 class InteractionManager {
-  constructor(camera, scene) {
+  constructor(camera, scene, hud, inputManager) {
     this.camera = camera;
     this.scene = scene;
+    this.hud = hud;
+    this.inputManager = inputManager;
     this.interactiveObjects = [];
     this.raycaster = new THREE.Raycaster();
     this.currentTarget = null; // Currently highlighted interactive object
 
-    // Bind keyboard listener
-    this.handleKeyPress = this.handleKeyPress.bind(this);
-    window.addEventListener("keydown", this.handleKeyPress);
+    // Subscribe to interact key via InputManager
+    this.setupInputHandlers();
+  }
+
+  /**
+   * Setup input handlers via InputManager
+   */
+  setupInputHandlers() {
+    this.inputManager.onSystemInput('interact', () => {
+      if (this.currentTarget && this.currentTarget.onInteract) {
+        this.currentTarget.onInteract();
+      }
+    });
   }
 
   /**
@@ -117,23 +129,12 @@ class InteractionManager {
   }
 
   /**
-   * Handle keyboard input for interactions
-   * @param {KeyboardEvent} event - Keyboard event
-   */
-  handleKeyPress(event) {
-    if (event.code === "KeyE" && this.currentTarget) {
-      // Trigger the interaction callback
-      if (this.currentTarget.onInteract) {
-        this.currentTarget.onInteract();
-      }
-    }
-  }
-
-  /**
-   * Cleanup - remove event listeners
+   * Cleanup - clear references
    */
   dispose() {
-    window.removeEventListener("keydown", this.handleKeyPress);
+    // InputManager handles event listener cleanup
+    this.hud = null;
+    this.interactiveObjects = [];
   }
 }
 

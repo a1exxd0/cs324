@@ -19,7 +19,9 @@ import { showCutscene } from "./LevelTwo/Cutscene.js";
  * Manages level lifecycle - initialization, cleanup, and state
  */
 export class LevelManager {
-  constructor() {
+  constructor(stateManager, inputManager) {
+    this.stateManager = stateManager;
+    this.inputManager = inputManager;
     this.scene = null;
     this.camera = null;
     this.renderer = null;
@@ -38,6 +40,9 @@ export class LevelManager {
    * @param {Function} onCutsceneEnd - Callback when cutscene completes
    */
   async startLevel1(onCutsceneEnd) {
+    // Update game state
+    this.stateManager.startLevel(1);
+
     // Suppress Three.js texture unit warnings
     suppressTextureWarnings();
 
@@ -61,10 +66,15 @@ export class LevelManager {
     this.hud.setObjective("Find the Emergency Override Keycard");
 
     // Interaction system
-    this.interactionManager = new InteractionManager(this.camera, this.scene);
+    this.interactionManager = new InteractionManager(
+      this.camera,
+      this.scene,
+      this.hud,
+      this.inputManager
+    );
 
     // Camera manager
-    this.cameraManager = new CameraManager(this.camera, this.hud);
+    this.cameraManager = new CameraManager(this.camera, this.hud, this.inputManager);
     this.hud.showCameraView("Player View (C to switch)", false);
 
     // Level loading
@@ -76,11 +86,11 @@ export class LevelManager {
       this.hud,
     );
     console.log("Level data loaded, portalState:", this.levelData.portalState);
-    this.thirdPersonCamera = new ThirdPersonCamera(this.camera);
+    this.thirdPersonCamera = new ThirdPersonCamera(this.camera, this.inputManager);
     this.thirdPersonCamera.setCollidables(this.levelData.collidables);
 
     // Character loading
-    this.character = new SwatCharacter();
+    this.character = new SwatCharacter(this.camera, this.inputManager, this.stateManager);
     const model = await this.character.initialize();
 
     this.scene.add(model);
@@ -113,16 +123,7 @@ export class LevelManager {
     );
     this.gameLoop.start();
 
-    // ESC key listener for pause menu
-    this.handleEscapeKey = (event) => {
-      if (event.key === "Escape") {
-        // Import togglePauseMenu dynamically to avoid circular dependency
-        if (window.togglePauseMenu) {
-          window.togglePauseMenu();
-        }
-      }
-    };
-    window.addEventListener("keydown", this.handleEscapeKey);
+    // ESC key is now handled by InputManager in main.js
   }
 
   /**
@@ -130,6 +131,9 @@ export class LevelManager {
    * @param {Function} onCutsceneComplete - Callback when cutscene completes
    */
   async startLevel2(onCutsceneComplete) {
+    // Update game state
+    this.stateManager.startLevel(2);
+
     // Suppress Three.js texture unit warnings
     suppressTextureWarnings();
 
@@ -151,7 +155,12 @@ export class LevelManager {
     this.hud.setObjective("Explore the Arctic terrain");
 
     // Interaction system
-    this.interactionManager = new InteractionManager(this.camera, this.scene);
+    this.interactionManager = new InteractionManager(
+      this.camera,
+      this.scene,
+      this.hud,
+      this.inputManager
+    );
 
     // Setup Level 2 scene (terrain, lighting, etc.)
     // Pass callback for building inspection
@@ -170,17 +179,17 @@ export class LevelManager {
         if (onCutsceneComplete) {
           onCutsceneComplete();
         }
-      }, this.renderer, this.hud);
+      }, this.stateManager, this.renderer, this.hud);
     };
 
     this.levelData = setupLevelTwo(this.scene, this.interactionManager, onBuildingInspect);
 
     // Camera manager
-    this.cameraManager = new CameraManager(this.camera, this.hud);
+    this.cameraManager = new CameraManager(this.camera, this.hud, this.inputManager);
     this.hud.showCameraView("Player View (C to switch)", false);
 
     // Character loading
-    this.character = new SwatCharacter();
+    this.character = new SwatCharacter(this.camera, this.inputManager, this.stateManager);
     const model = await this.character.initialize();
 
     this.scene.add(model);
@@ -194,7 +203,7 @@ export class LevelManager {
     this.character.setCollidables(this.levelData.collidables);
 
     // Set up third person camera
-    this.thirdPersonCamera = new ThirdPersonCamera(this.camera);
+    this.thirdPersonCamera = new ThirdPersonCamera(this.camera, this.inputManager);
     this.thirdPersonCamera.setTarget(this.character);
     this.thirdPersonCamera.setCollidables(this.levelData.collidables);
 
@@ -212,15 +221,7 @@ export class LevelManager {
     );
     this.gameLoop.start();
 
-    // ESC key listener for pause menu
-    this.handleEscapeKey = (event) => {
-      if (event.key === "Escape") {
-        if (window.togglePauseMenu) {
-          window.togglePauseMenu();
-        }
-      }
-    };
-    window.addEventListener("keydown", this.handleEscapeKey);
+    // ESC key is now handled by InputManager in main.js
   }
 
   /**
@@ -240,11 +241,7 @@ export class LevelManager {
       this.gameLoop = null;
     }
 
-    // Remove event listeners
-    if (this.handleEscapeKey) {
-      window.removeEventListener("keydown", this.handleEscapeKey);
-      this.handleEscapeKey = null;
-    }
+    // Event listeners are now managed by InputManager - no cleanup needed here
 
     // Hide and remove HUD
     if (this.hud) {

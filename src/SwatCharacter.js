@@ -2,8 +2,11 @@ import { Character } from "./Character.js";
 import * as THREE from "three";
 
 export class SwatCharacter extends Character {
-  constructor() {
+  constructor(camera, inputManager, stateManager) {
     super();
+    this.camera = camera;
+    this.inputManager = inputManager;
+    this.stateManager = stateManager;
     this.moveSpeed = 2.0;
     this.keys = {
       w: false,
@@ -20,14 +23,14 @@ export class SwatCharacter extends Character {
     this.isJumping = false;
     this.jumpCooldown = 0;
     this.jumpCooldownDuration = 0.5;
-    this.isFrozen = false; // New flag for freezing character
-    this.inCutscene = false; // Flag for cutscene mode (no player input)
+    this.isFrozen = false; // Frozen state (for temporary disabling)
 
     // Collision detection
     this.collidables = [];
     this.collisionDistance = 0.6; // Distance to check for obstacles
     this.raycaster = new THREE.Raycaster();
     this.groundCheckDistance = 10; // Max distance to check for ground
+    this.stepUpThreshold = 0.5; // Max height difference to auto-step up
 
     this.setupInputHandlers();
   }
@@ -88,19 +91,41 @@ export class SwatCharacter extends Character {
   }
 
   setupInputHandlers() {
-    const handleKey = (e, value) => {
-      if (this.isFrozen || this.inCutscene) return; // Ignore input when frozen or in cutscene
+    const handleKeyDown = (e) => {
+      if (this.isFrozen) return; // Ignore input when frozen
 
       const key = e.key.toLowerCase();
       if (key === "shift") {
-        this.keys.shift = value;
+        this.keys.shift = true;
       } else if (key in this.keys) {
-        this.keys[key] = value;
+        this.keys[key] = true;
       }
     };
 
-    window.addEventListener("keydown", (e) => handleKey(e, true));
-    window.addEventListener("keyup", (e) => handleKey(e, false));
+    const handleKeyUp = (e) => {
+      const key = e.key.toLowerCase();
+      if (key === "shift") {
+        this.keys.shift = false;
+      } else if (key in this.keys) {
+        this.keys[key] = false;
+      }
+    };
+
+    // Subscribe to InputManager game input events
+    this.inputManager.onGameInput("keydown", handleKeyDown);
+    this.inputManager.onGameInput("keyup", handleKeyUp);
+
+    // Freeze/unfreeze based on game state
+    this.stateManager.on("gamePaused", () => this.freeze());
+    this.stateManager.on("gameResumed", () => this.unfreeze());
+    this.stateManager.on("stateChanged", ({ to }) => {
+      // Freeze during cutscenes
+      if (to === "CUTSCENE") {
+        this.freeze();
+      } else if (to === "LEVEL_1_ACTIVE" || to === "LEVEL_2_ACTIVE") {
+        this.unfreeze();
+      }
+    });
   }
 
   checkCollision(direction) {
@@ -133,13 +158,14 @@ export class SwatCharacter extends Character {
     return false;
   }
 
-  findGroundBelow() {
+  findGroundBelow(heightOffset = 0.1) {
     if (this.collidables.length === 0) return null;
 
-    // Cast ray downward from slightly above character's feet (pivot point)
-    // This prevents the ray from starting inside the floor geometry
+    // Cast ray downward from specified height above character's feet
+    // Default 0.1 prevents starting inside floor geometry
+    // Use higher offset (e.g., stepUpThreshold + 0.1) to detect elevated ground
     const origin = this.container.position.clone();
-    origin.y += 0.1; // Start slightly above feet to avoid starting inside geometry
+    origin.y += heightOffset;
     const direction = new THREE.Vector3(0, -1, 0);
 
     this.raycaster.set(origin, direction);
@@ -252,12 +278,23 @@ export class SwatCharacter extends Character {
       if (!this.checkCollision(worldDirection)) {
         this.container.position.add(movement);
 
-        // Check if we're still above ground after moving
-        // Prevent walking off edges into void
-        const groundCheck = this.findGroundBelow();
-        if (!groundCheck || groundCheck.distance - 0.1 > 2.0) {
+        // Check ground from higher up to detect steps/slopes we can climb
+        const stepCheckHeight = this.stepUpThreshold + 0.1;
+        const groundCheck = this.findGroundBelow(stepCheckHeight);
+        if (!groundCheck || groundCheck.distance > stepCheckHeight + 2.0) {
           // Too far from ground or no ground - undo movement
           this.container.position.copy(oldPosition);
+        } else {
+          // Step up small slopes automatically
+          const newGroundY = groundCheck.point.y + 0.05;
+          const heightDiff = newGroundY - this.container.position.y;
+          if (
+            heightDiff > 0 &&
+            heightDiff <= this.stepUpThreshold &&
+            !this.isJumping
+          ) {
+            this.container.position.y = newGroundY;
+          }
         }
       } else {
         // Blocked - try sliding along X axis only
@@ -266,9 +303,21 @@ export class SwatCharacter extends Character {
 
         if (xMovement.length() > 0 && !this.checkCollision(xDirection)) {
           this.container.position.add(xMovement);
-          const groundCheck = this.findGroundBelow();
-          if (!groundCheck || groundCheck.distance - 0.1 > 2.0) {
+          const stepCheckHeight = this.stepUpThreshold + 0.1;
+          const groundCheck = this.findGroundBelow(stepCheckHeight);
+          if (!groundCheck || groundCheck.distance > stepCheckHeight + 2.0) {
             this.container.position.copy(oldPosition);
+          } else {
+            // Step up small slopes automatically
+            const newGroundY = groundCheck.point.y + 0.05;
+            const heightDiff = newGroundY - this.container.position.y;
+            if (
+              heightDiff > 0 &&
+              heightDiff <= this.stepUpThreshold &&
+              !this.isJumping
+            ) {
+              this.container.position.y = newGroundY;
+            }
           }
         }
 
@@ -281,9 +330,21 @@ export class SwatCharacter extends Character {
 
         if (zMovement.length() > 0 && !this.checkCollision(zDirection)) {
           this.container.position.add(zMovement);
-          const groundCheck = this.findGroundBelow();
-          if (!groundCheck || groundCheck.distance - 0.1 > 2.0) {
+          const stepCheckHeight = this.stepUpThreshold + 0.1;
+          const groundCheck = this.findGroundBelow(stepCheckHeight);
+          if (!groundCheck || groundCheck.distance > stepCheckHeight + 2.0) {
             this.container.position.copy(oldPos2);
+          } else {
+            // Step up small slopes automatically
+            const newGroundY = groundCheck.point.y + 0.05;
+            const heightDiff = newGroundY - this.container.position.y;
+            if (
+              heightDiff > 0 &&
+              heightDiff <= this.stepUpThreshold &&
+              !this.isJumping
+            ) {
+              this.container.position.y = newGroundY;
+            }
           }
         } else {
           // Restore X movement if Z failed

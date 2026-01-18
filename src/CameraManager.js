@@ -4,9 +4,10 @@ import * as THREE from "three";
  * Manages camera view switching between player and security camera views
  */
 export class CameraManager {
-  constructor(camera, hud) {
+  constructor(camera, hud, inputManager) {
     this.camera = camera;
     this.hud = hud;
+    this.inputManager = inputManager;
     this.isSecurityView = false;
     this.securityCameras = new Map(); // Map of camera name -> {position, target}
     this.currentSecurityCamera = null;
@@ -32,10 +33,8 @@ export class CameraManager {
    * Set up keyboard controls for camera switching
    */
   setupKeyboardControls() {
-    window.addEventListener("keydown", (e) => {
-      if (e.key.toLowerCase() === "c") {
-        this.toggleCamera();
-      }
+    this.inputManager.onSystemInput('cameraToggle', () => {
+      this.toggleCamera();
     });
   }
 
@@ -121,5 +120,13 @@ export class CameraManager {
    */
   unlockCamera() {
     this.isLocked = false;
+  }
+
+  /**
+   * Cleanup - clear references
+   */
+  cleanup() {
+    // InputManager handles event listener cleanup
+    this.securityCameras.clear();
   }
 }

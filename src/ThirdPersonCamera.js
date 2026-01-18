@@ -3,10 +3,12 @@ import * as THREE from "three";
 export class ThirdPersonCamera {
   constructor(
     camera,
+    inputManager,
     offset = new THREE.Vector3(0, 0.2, -2),
     centeringOffset = new THREE.Vector3(-0.3, 0, 0),
   ) {
     this.camera = camera;
+    this.inputManager = inputManager;
     this.offset = offset;
     this.centeringOffset = centeringOffset;
     this.target = null;
@@ -14,8 +16,6 @@ export class ThirdPersonCamera {
     this.collidables = [];
     this.raycaster = new THREE.Raycaster();
     this.collisionBuffer = 0.2; // Keep camera this distance from obstacles
-    this.clickHandler = null;
-    this.mouseMoveHandler = null;
     this.setupMouseControl();
   }
 
@@ -29,37 +29,26 @@ export class ThirdPersonCamera {
 
   setupMouseControl() {
     // Request pointer lock on click
-    this.clickHandler = () => {
-      document.body.requestPointerLock();
-    };
-    document.addEventListener("click", this.clickHandler);
+    this.inputManager.onGameInput('click', () => {
+      this.inputManager.requestPointerLock();
+    });
 
     // Handle mouse movement
-    this.mouseMoveHandler = (e) => {
-      if (
-        document.pointerLockElement === document.body &&
-        this.target?.container
-      ) {
+    this.inputManager.onGameInput('mousemove', (e) => {
+      if (this.target?.container) {
         // Rotate character based on horizontal mouse movement (left/right)
         const rotationDelta = -e.movementX * this.mouseSensitivity;
         this.target.container.rotateY(rotationDelta);
       }
-    };
-    document.addEventListener("mousemove", this.mouseMoveHandler);
+    });
   }
 
   /**
-   * Clean up event listeners
+   * Clean up - clear references
    */
   cleanup() {
-    if (this.clickHandler) {
-      document.removeEventListener("click", this.clickHandler);
-      this.clickHandler = null;
-    }
-    if (this.mouseMoveHandler) {
-      document.removeEventListener("mousemove", this.mouseMoveHandler);
-      this.mouseMoveHandler = null;
-    }
+    // InputManager handles event listener cleanup
+    this.target = null;
   }
 
   update() {
