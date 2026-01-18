@@ -7,6 +7,7 @@
  * @param {Object} config.doors - Door objects that can be toggled
  * @param {Array} config.mixers - Animation mixers for animated objects
  * @param {Function} config.toggleDoor - Function to toggle door states
+ * @param {Object} config.portalState - Portal state object for special interactions
  */
 class LevelData {
   constructor(config) {
@@ -17,6 +18,7 @@ class LevelData {
     this.doors = config.doors || {};
     this.mixers = config.mixers || [];
     this.toggleDoor = config.toggleDoor || (() => {});
+    this.portalState = config.portalState || null;
   }
 }
 

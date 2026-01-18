@@ -5,7 +5,14 @@ export class SwatCharacter extends Character {
   constructor() {
     super();
     this.moveSpeed = 2.0;
-    this.keys = { w: false, a: false, s: false, d: false, " ": false };
+    this.keys = {
+      w: false,
+      a: false,
+      s: false,
+      d: false,
+      " ": false,
+      shift: false,
+    };
 
     this.jumpForce = 5.0;
     this.gravity = -15.0;
@@ -13,6 +20,8 @@ export class SwatCharacter extends Character {
     this.isJumping = false;
     this.jumpCooldown = 0;
     this.jumpCooldownDuration = 0.5;
+    this.isFrozen = false; // New flag for freezing character
+    this.inCutscene = false; // Flag for cutscene mode (no player input)
 
     // Collision detection
     this.collidables = [];
@@ -21,6 +30,32 @@ export class SwatCharacter extends Character {
     this.groundCheckDistance = 10; // Max distance to check for ground
 
     this.setupInputHandlers();
+  }
+
+  /**
+   * Freeze the character (prevent all movement)
+   */
+  freeze() {
+    this.isFrozen = true;
+    this.keys = {
+      w: false,
+      a: false,
+      s: false,
+      d: false,
+      " ": false,
+      shift: false,
+    };
+    // Set to idle animation
+    if (this.currentAction) {
+      this.playAnimation("idle");
+    }
+  }
+
+  /**
+   * Unfreeze the character (allow movement again)
+   */
+  unfreeze() {
+    this.isFrozen = false;
   }
 
   setCollidables(collidables) {
@@ -47,14 +82,21 @@ export class SwatCharacter extends Character {
         "strafeRight",
       ),
       this.loadAnimation("models/characters/swat_man_jump.glb", "jump"),
+      this.loadAnimation("/models/characters/swat_man_running.glb", "run"),
     ]);
     return this.container;
   }
 
   setupInputHandlers() {
     const handleKey = (e, value) => {
+      if (this.isFrozen || this.inCutscene) return; // Ignore input when frozen or in cutscene
+
       const key = e.key.toLowerCase();
-      if (key in this.keys) this.keys[key] = value;
+      if (key === "shift") {
+        this.keys.shift = value;
+      } else if (key in this.keys) {
+        this.keys[key] = value;
+      }
     };
 
     window.addEventListener("keydown", (e) => handleKey(e, true));
@@ -116,6 +158,7 @@ export class SwatCharacter extends Character {
   update(deltaTime) {
     super.update(deltaTime);
     if (!this.model) return;
+    if (this.isFrozen || this.inCutscene) return; // Don't process movement when frozen or in cutscene
 
     const moveDirection = new THREE.Vector3();
     let targetAnimation = "idle";
@@ -159,7 +202,12 @@ export class SwatCharacter extends Character {
     }
 
     // Determine horizontal movement direction (independent of jump state)
-    if (this.keys.w) {
+    let isRunning = false;
+    if (this.keys.w && this.keys.shift) {
+      moveDirection.z = 1;
+      targetAnimation = "run";
+      isRunning = true;
+    } else if (this.keys.w) {
       moveDirection.z = 1;
       targetAnimation = "walkForward";
     } else if (this.keys.s) {
@@ -191,10 +239,11 @@ export class SwatCharacter extends Character {
         .clone()
         .applyQuaternion(this.container.quaternion);
 
+      const currentSpeed = isRunning ? this.moveSpeed * 2 : this.moveSpeed;
       const movement = moveDirection
         .clone()
         .normalize()
-        .multiplyScalar(this.moveSpeed * deltaTime)
+        .multiplyScalar(currentSpeed * deltaTime)
         .applyQuaternion(this.container.quaternion);
 
       const oldPosition = this.container.position.clone();

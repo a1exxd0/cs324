@@ -36,10 +36,16 @@ export class HUD {
     this.interactionElement.className = "interaction-prompt";
     this.interactionElement.style.display = "none";
 
+    // Create camera view indicator
+    this.cameraViewElement = document.createElement("div");
+    this.cameraViewElement.className = "camera-view-indicator";
+    this.cameraViewElement.style.display = "none";
+
     // Assemble HUD
     this.container.appendChild(this.crosshair);
     this.container.appendChild(this.objectiveElement);
     this.container.appendChild(this.interactionElement);
+    this.container.appendChild(this.cameraViewElement);
     document.body.appendChild(this.container);
   }
 
@@ -68,6 +74,29 @@ export class HUD {
   hideInteractionPrompt() {
     this.interactionPrompt = "";
     this.interactionElement.style.display = "none";
+  }
+
+  /**
+   * Show camera view indicator
+   * @param {string} viewName - The name of the camera view
+   * @param {boolean} isSecurityCamera - Whether this is the security camera view (for styling)
+   */
+  showCameraView(viewName, isSecurityCamera = false) {
+    this.cameraViewElement.textContent = viewName;
+    this.cameraViewElement.style.display = "block";
+
+    if (isSecurityCamera) {
+      this.cameraViewElement.className = "camera-view-indicator security-camera";
+    } else {
+      this.cameraViewElement.className = "camera-view-indicator player-camera";
+    }
+  }
+
+  /**
+   * Hide camera view indicator
+   */
+  hideCameraView() {
+    this.cameraViewElement.style.display = "none";
   }
 
   /**

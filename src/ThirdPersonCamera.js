@@ -14,6 +14,8 @@ export class ThirdPersonCamera {
     this.collidables = [];
     this.raycaster = new THREE.Raycaster();
     this.collisionBuffer = 0.2; // Keep camera this distance from obstacles
+    this.clickHandler = null;
+    this.mouseMoveHandler = null;
     this.setupMouseControl();
   }
 
@@ -27,12 +29,13 @@ export class ThirdPersonCamera {
 
   setupMouseControl() {
     // Request pointer lock on click
-    document.addEventListener("click", () => {
+    this.clickHandler = () => {
       document.body.requestPointerLock();
-    });
+    };
+    document.addEventListener("click", this.clickHandler);
 
     // Handle mouse movement
-    document.addEventListener("mousemove", (e) => {
+    this.mouseMoveHandler = (e) => {
       if (
         document.pointerLockElement === document.body &&
         this.target?.container
@@ -41,7 +44,22 @@ export class ThirdPersonCamera {
         const rotationDelta = -e.movementX * this.mouseSensitivity;
         this.target.container.rotateY(rotationDelta);
       }
-    });
+    };
+    document.addEventListener("mousemove", this.mouseMoveHandler);
+  }
+
+  /**
+   * Clean up event listeners
+   */
+  cleanup() {
+    if (this.clickHandler) {
+      document.removeEventListener("click", this.clickHandler);
+      this.clickHandler = null;
+    }
+    if (this.mouseMoveHandler) {
+      document.removeEventListener("mousemove", this.mouseMoveHandler);
+      this.mouseMoveHandler = null;
+    }
   }
 
   update() {

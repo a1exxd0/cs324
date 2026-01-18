@@ -5,14 +5,15 @@ import LevelOne from "./LevelOne/index.js";
  * @param {string} levelName - Name of the level to load
  * @param {THREE.Scene} scene - The Three.js scene
  * @param {InteractionManager} interactionManager - Optional interaction manager
+ * @param {HUD} hud - Optional HUD instance for updating objectives
  * @returns {LevelData} Level configuration data
  */
 class SceneLoader {
-  loadLevel(levelName, scene, interactionManager = null) {
+  loadLevel(levelName, scene, interactionManager = null, hud = null) {
     switch (levelName) {
       case "level1":
         const levelOne = new LevelOne();
-        return levelOne.build(scene, interactionManager);
+        return levelOne.build(scene, interactionManager, hud);
       default:
         throw new Error(`Unknown level: ${levelName}`);
     }

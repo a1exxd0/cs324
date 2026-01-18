@@ -1,6 +1,7 @@
 /**
  * FurnitureProps - Desks, vault door, and other furniture
  */
+import * as THREE from "three";
 
 /**
  * Load and configure reception desk
@@ -75,7 +76,10 @@ export function loadVaultDoor(
             }
             // Disable interaction after opening
             if (vaultDoorState.interactionId && interactionManager) {
-              interactionManager.setEnabled(vaultDoorState.interactionId, false);
+              interactionManager.setEnabled(
+                vaultDoorState.interactionId,
+                false,
+              );
             }
           },
         });
@@ -98,7 +102,10 @@ export function loadVaultDoor(
             vaultDoorState.action.play();
             // Disable further interaction while opening
             if (vaultDoorState.interactionId) {
-              interactionManager.setEnabled(vaultDoorState.interactionId, false);
+              interactionManager.setEnabled(
+                vaultDoorState.interactionId,
+                false,
+              );
             }
           }
         },
@@ -106,5 +113,163 @@ export function loadVaultDoor(
     }
 
     propLoader.scene.add(door);
+  });
+}
+
+/**
+ * Load and configure body scanning machines
+ * @param {PropLoader} propLoader - The prop loader instance
+ * @param {Object} config - Level configuration
+ */
+export function loadBodyScanningMachines(propLoader, config) {
+  const { bodyScanningMachinePositions } = config;
+
+  bodyScanningMachinePositions.forEach((position) => {
+    // Choose model based on whether there's an alien on the bed
+    const modelPath = position.hasAlien
+      ? "/models/alien_on_bed.glb"
+      : "/models/body_scanning_machine.glb";
+
+    propLoader.loadModel(modelPath, (gltf) => {
+      const machine = gltf.scene.clone();
+      machine.position.set(position.x, position.y, position.z);
+      machine.scale.set(1, 1, 1);
+      machine.rotation.y = position.rotation || 0;
+
+      propLoader.scene.add(machine);
+    });
+  });
+}
+
+/**
+ * Load and configure time machine
+ * @param {PropLoader} propLoader - The prop loader instance
+ * @param {Object} config - Level configuration
+ */
+export function loadTimeMachine(propLoader, config) {
+  const { timeMachinePosition } = config;
+
+  propLoader.loadModel("/models/time_machine.glb", (gltf) => {
+    const timeMachine = gltf.scene;
+    timeMachine.position.set(
+      timeMachinePosition.x,
+      timeMachinePosition.y,
+      timeMachinePosition.z,
+    );
+    timeMachine.scale.set(0.068, 0.068, 0.068);
+    timeMachine.rotateY(Math.PI);
+
+    propLoader.addCollider(5, 1, 1, timeMachinePosition, false);
+    propLoader.addCollider(
+      1,
+      0.5,
+      1,
+      {
+        x: timeMachinePosition.x + 3,
+        y: timeMachinePosition.y,
+        z: timeMachinePosition.z,
+      },
+      false,
+    );
+    propLoader.scene.add(timeMachine);
+  });
+}
+
+/**
+ * Load and configure security camera
+ * @param {PropLoader} propLoader - The prop loader instance
+ * @param {Object} config - Level configuration
+ */
+export function loadSecurityCamera(propLoader, config) {
+  const { securityCameraPosition } = config;
+
+  propLoader.loadModel("/models/security_camera.glb", (gltf) => {
+    const camera = gltf.scene;
+    camera.position.set(
+      securityCameraPosition.x,
+      securityCameraPosition.y,
+      securityCameraPosition.z,
+    );
+    camera.scale.set(1.3, 1.3, 1.3);
+    // Rotate to face into the room (southwest direction)
+    camera.rotation.y = Math.PI * 0.75 + Math.PI;
+    camera.rotation.x = Math.PI * 0.1;
+
+    propLoader.scene.add(camera);
+  });
+}
+
+/**
+ * Load and configure emergency keycard (uno reverse card)
+ * @param {PropLoader} propLoader - The prop loader instance
+ * @param {Object} config - Level configuration
+ * @param {InteractionManager} interactionManager - Interaction manager
+ * @param {HUD} hud - HUD instance to update objective
+ * @param {Object} portalState - Portal state to enable after pickup
+ */
+export function loadEmergencyKeycard(
+  propLoader,
+  config,
+  interactionManager,
+  hud,
+  portalState,
+) {
+  const { deskPosition } = config;
+
+  propLoader.loadModel("/models/uno_reverse_card.glb", (gltf) => {
+    const keycard = gltf.scene;
+    // Position on top of reception desk
+    keycard.position.set(
+      deskPosition.x + 0.35,
+      deskPosition.y + 0.94,
+      deskPosition.z + 0.1,
+    );
+    keycard.scale.set(0.3, 0.3, 0.3);
+    keycard.rotation.y = Math.PI / 4; // Rotate 45 degrees for visual interest
+
+    // Add a larger invisible mesh for easier interaction detection
+    const interactionGeometry = new THREE.BoxGeometry(1.5, 5, 1.5);
+    const interactionMaterial = new THREE.MeshBasicMaterial({
+      visible: false,
+      transparent: true,
+      opacity: 0,
+    });
+    const interactionMesh = new THREE.Mesh(
+      interactionGeometry,
+      interactionMaterial,
+    );
+    keycard.add(interactionMesh);
+
+    propLoader.scene.add(keycard);
+
+    // Register as interactive object
+    if (interactionManager) {
+      const interactionId = interactionManager.register({
+        mesh: keycard,
+        radius: 3, // Increased interaction distance
+        promptText: "E to collect Emergency Override Keycard",
+        enabled: true,
+        onInteract: () => {
+          // Remove keycard from scene
+          propLoader.scene.remove(keycard);
+
+          // Unregister the interaction so the prompt doesn't show anymore
+          interactionManager.unregister(interactionId);
+
+          // Update HUD objective
+          if (hud) {
+            hud.setObjective("Activate portal with keycard");
+          }
+
+          // Enable the portal after keycard pickup
+          if (portalState) {
+            // Import and call enablePortal function
+            import("./EnvironmentalProps.js").then((module) => {
+              module.enablePortal(portalState, interactionManager);
+            });
+          }
+        },
+      });
+    }
   });
 }

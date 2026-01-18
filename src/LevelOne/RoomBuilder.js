@@ -266,9 +266,16 @@ class RoomBuilder {
 
   /**
    * Create blood decals on the floor
+   * @param {Object} options - Optional parameters for blood decals
+   * @param {Array} options.bloodPuddles - Array of blood puddle positions (defaults to config.bloodPuddles)
+   * @param {Object} options.radioactiveSpillCenter - Center position for spill area (defaults to config.radioactiveSpillCenter)
    */
-  buildBloodDecals() {
-    const { bloodPuddles, radioactiveSpillCenter } = this.config;
+  buildBloodDecals(options = {}) {
+    const {
+      bloodPuddles = this.config.bloodPuddles,
+      radioactiveSpillCenter = this.config.radioactiveSpillCenter,
+    } = options;
+
     const bloodMaterial = createMaterial(0x7a0f0f, 0.95, 0.0);
 
     // Main blood puddles
@@ -282,19 +289,16 @@ class RoomBuilder {
       this.scene.add(mesh);
     });
 
-    // Radioactive spill
-    const spillMaterial = createMaterial(0x6b0b0b, 0.98, 0.0, 0x2cfa1f, 0.03);
-
     for (let i = 0; i < 12; i++) {
       const spill = new THREE.Mesh(
         new THREE.CircleGeometry(THREE.MathUtils.randFloat(0.6, 1.4), 24),
-        spillMaterial,
+        bloodMaterial,
       );
       spill.rotation.x = -Math.PI / 2;
       spill.rotation.z = THREE.MathUtils.randFloat(0, Math.PI * 2);
       spill.position.set(
         radioactiveSpillCenter.x + THREE.MathUtils.randFloat(-1.7, 2.5),
-        0.001 + i * 0.0001,
+        0.001 + i * 0.01,
         radioactiveSpillCenter.z + THREE.MathUtils.randFloat(-1.5, 3.0),
       );
       this.scene.add(spill);

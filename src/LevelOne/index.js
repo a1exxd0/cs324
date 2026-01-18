@@ -20,17 +20,20 @@ class LevelOne {
     this.mixers = [];
     this.config = config;
     this.vaultDoorState = {}; // Track vault door state
+    this.portalState = {}; // Track portal state
   }
 
   /**
    * Build the level and return level data
    * @param {THREE.Scene} scene - The Three.js scene to add objects to
    * @param {InteractionManager} interactionManager - Optional interaction manager for interactive objects
+   * @param {HUD} hud - Optional HUD instance for updating objectives
    * @returns {LevelData} Level data with spawn point, collidables, lights, doors, and mixers
    */
-  build(scene, interactionManager = null) {
+  build(scene, interactionManager = null, hud = null) {
     this.scene = scene;
     this.interactionManager = interactionManager;
+    this.hud = hud;
     this.buildReception();
     this.buildLaboratory();
 
@@ -41,7 +44,16 @@ class LevelOne {
       doors: this.doors,
       mixers: this.mixers,
       toggleDoor: this.toggleDoor.bind(this),
+      portalState: this.portalState, // Expose portal state
     });
+  }
+
+  /**
+   * Get the portal state (for setting character reference)
+   * @returns {Object} Portal state object
+   */
+  getPortalState() {
+    return this.portalState;
   }
 
   /**
@@ -69,6 +81,13 @@ class LevelOne {
     // Load props (grouped by type)
     LightingProps.loadCeilingLights(propLoader, this.config);
     FurnitureProps.loadReceptionDesk(propLoader, this.config);
+    FurnitureProps.loadEmergencyKeycard(
+      propLoader,
+      this.config,
+      this.interactionManager,
+      this.hud,
+      this.portalState, // Pass portal state to enable it after pickup
+    );
     FurnitureProps.loadVaultDoor(
       propLoader,
       this.config,
@@ -93,6 +112,12 @@ class LevelOne {
       this.collidables,
       this.doors,
       this.config,
+    );
+    const propLoader = new PropLoader(
+      this.scene,
+      this.collidables,
+      this.lights,
+      this.mixers,
     );
 
     // Build laboratory floor and ceiling
@@ -120,6 +145,29 @@ class LevelOne {
         west: false, // Solid west wall
       },
     });
+
+    // Add blood decals to laboratory
+    roomBuilder.buildBloodDecals({
+      bloodPuddles: this.config.labBloodPuddles,
+      radioactiveSpillCenter: this.config.labRadioactiveSpillCenter,
+    });
+
+    // Load laboratory lighting (dim grid of ceiling lights)
+    LightingProps.loadLaboratoryLights(propLoader, this.config);
+
+    // Load laboratory props
+    FurnitureProps.loadBodyScanningMachines(propLoader, this.config);
+    FurnitureProps.loadTimeMachine(propLoader, this.config);
+    FurnitureProps.loadSecurityCamera(propLoader, this.config);
+
+    // Load portal on time machine
+    EnvironmentalProps.loadPortal(
+      propLoader,
+      this.config,
+      this.interactionManager,
+      this.portalState,
+      this.hud,
+    );
 
     // Automatically open the laboratory doorway
     this.toggleDoor("lab-east");

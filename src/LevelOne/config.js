@@ -20,7 +20,7 @@ export default {
   // Position 3: -roomWidth/2 + 0.5 = -3, roomDepth/2 - 1.5 = 2.5
   barrelPositions: [
     { x: 2.5, z: 3 },
-    { x: -2, z: 3.5 },
+    { x: -2, z: 3.0 },
     { x: -3, z: 2.5 },
   ],
 
@@ -70,5 +70,56 @@ export default {
     wallHeight: 3,
     offsetX: -8.5, // West of reception room
     offsetZ: 0, // Aligned with reception on Z-axis
+  },
+
+  // Body scanning machine positions (in laboratory)
+  bodyScanningMachinePositions: [
+    { x: -11, y: 0, z: -3, rotation: 0, hasAlien: false },
+    { x: -11, y: 0, z: 3, rotation: Math.PI, hasAlien: true },
+    { x: -8, y: 0, z: -3, rotation: 0, hasAlien: true },
+    { x: -8, y: 0, z: 3, rotation: Math.PI, hasAlien: false },
+    { x: -5, y: 0, z: -3, rotation: 0, hasAlien: true },
+    { x: -5, y: 0, z: 3, rotation: Math.PI, hasAlien: false },
+  ],
+
+  // Time machine position (at end of laboratory, centered between furthest beds)
+  timeMachinePosition: {
+    x: -12.5, // End of lab, past the furthest beds at x: -11
+    y: 0,
+    z: 0, // Centered between beds at z: -3 and z: 3
+  },
+
+  // Laboratory blood decals
+  labBloodPuddles: [
+    { radius: 0.5, x: -10.5, z: -4.5 }, // Near first bed
+    { radius: 0.4, x: -7.8, z: 4.2 }, // Near second bed
+    { radius: 0.35, x: -6, z: -2 }, // In the middle area
+  ],
+
+  // Laboratory radioactive spill center
+  labRadioactiveSpillCenter: {
+    x: -9, // Middle of the lab
+    z: 0, // Centered on Z-axis
+  },
+
+  // Security camera position (top east corner of lab)
+  securityCameraPosition: {
+    x: -4, // East wall of lab (offsetX + width/2 - small offset)
+    y: 2.7, // Near ceiling
+    z: -6, // North wall of lab (offsetZ - depth/2 + small offset)
+  },
+
+  // Security camera look-at target (center of lab)
+  securityCameraTarget: {
+    x: -8.5, // Center of lab (same as lab.offsetX)
+    y: 0, // Ground level
+    z: 0, // Center on Z-axis
+  },
+
+  // Portal position (on time machine)
+  portalPosition: {
+    x: -12.5, // Same as time machine
+    y: 2.0, // Above the time machine platform
+    z: 0, // Same as time machine
   },
 };

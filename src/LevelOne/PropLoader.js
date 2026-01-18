@@ -52,8 +52,8 @@ class PropLoader {
    * @param {number} depth - Collider depth
    * @param {Object} position - Position {x, y, z}
    */
-  addCollider(width, height, depth, position) {
-    const collider = createCollider(width, height, depth, position);
+  addCollider(width, height, depth, position, visible = false) {
+    const collider = createCollider(width, height, depth, position, visible);
     this.scene.add(collider);
     this.collidables.push(collider);
   }
