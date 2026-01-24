@@ -28,7 +28,6 @@ export function loadRadioactiveBarrels(propLoader, config) {
 
     propLoader.scene.add(barrel);
 
-    // Clone barrels for other positions
     const barrelB = barrel.clone(true);
     barrelB.position.set(barrelPositions[1].x, 0.5, barrelPositions[1].z);
     propLoader.addCollider(1.3, 1.4, 1.3, barrelPositions[1]);

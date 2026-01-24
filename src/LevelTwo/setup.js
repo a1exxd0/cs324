@@ -20,7 +20,7 @@ export function setupLevelTwo(scene, interactionManager, onBuildingInspect) {
   const { terrain, collidable } = terrainGenerator.createTerrain(
     config.terrainSize,
     config.terrainResolution,
-    config.terrainThickness
+    config.terrainThickness,
   );
   scene.add(terrain);
   collidables.push(collidable);
@@ -30,22 +30,32 @@ export function setupLevelTwo(scene, interactionManager, onBuildingInspect) {
   terrainGenerator.addLighting(scene);
 
   // Apply scene settings
-  scene.fog = new THREE.Fog(
-    config.fog.color,
-    config.fog.near,
-    config.fog.far
-  );
+  scene.fog = new THREE.Fog(config.fog.color, config.fog.near, config.fog.far);
   scene.background = new THREE.Color(config.backgroundColor);
 
   // Load props
   const propLoader = new PropLoader(scene, collidables);
   loadSciFiBuilding(propLoader, config, interactionManager, onBuildingInspect);
 
+  // Add radioactive barrel near spawn
+  const barrelX = 4;
+  const barrelZ = 3;
+  const barrelTerrainHeight = terrainGenerator.getHeight(barrelX, barrelZ);
+
+  propLoader.loadModel("/models/radioactive_metal_barrel.glb", (gltf) => {
+    const barrel = gltf.scene;
+    barrel.position.set(barrelX, barrelTerrainHeight + 2.3, barrelZ);
+
+    const barrelLight = barrel.getObjectByName("Point");
+    propLoader.configurePointLight(barrelLight, 5, 2, 3, 0x2cfa1f);
+
+    scene.add(barrel);
+  });
+
   // Calculate player spawn height based on terrain
-  const spawnHeight = terrainGenerator.getHeight(
-    config.playerStart.x,
-    config.playerStart.z
-  ) + config.playerStart.y;
+  const spawnHeight =
+    terrainGenerator.getHeight(config.playerStart.x, config.playerStart.z) +
+    config.playerStart.y;
 
   return {
     terrainGenerator,

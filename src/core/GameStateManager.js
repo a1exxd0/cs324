@@ -61,7 +61,7 @@ export class GameStateManager {
     this.stateBeforePause = null;
     this.eventListeners = new Map();
     this.gameData = {
-      unlockedLevels: [0], // Only briefing unlocked initially - levels unlock via progression
+      unlockedLevels: [0],
       currentLevel: null,
     };
   }
