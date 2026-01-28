@@ -50,6 +50,18 @@ export function setupLevelTwo(scene, interactionManager, onBuildingInspect) {
     propLoader.configurePointLight(barrelLight, 5, 2, 3, 0x2cfa1f);
 
     scene.add(barrel);
+
+    // Second barrel next to the first
+    const barrelB = barrel.clone(true);
+    const barrelBX = barrelX + 1.2;
+    const barrelBZ = barrelZ + 0.5;
+    const barrelBHeight = terrainGenerator.getHeight(barrelBX, barrelBZ);
+    barrelB.position.set(barrelBX, barrelBHeight + 2.3, barrelBZ);
+
+    const barrelBLight = barrelB.getObjectByName("Point");
+    propLoader.configurePointLight(barrelBLight, 5, 2, 3, 0x2cfa1f);
+
+    scene.add(barrelB);
   });
 
   // Calculate player spawn height based on terrain
